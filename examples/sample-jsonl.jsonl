@@ -1,0 +1,6 @@
+{"timestamp":"2026-10-09T19:01:01Z","host":"lab-host","program":"sshd","pid":2101,"message":"Failed password for operator from 203.0.113.77 port 50101 ssh2"}
+{"timestamp":"2026-10-09T19:01:04Z","host":"lab-host","program":"sshd","pid":2102,"message":"Failed password for operator from 203.0.113.77 port 50102 ssh2"}
+{"timestamp":"2026-10-09T19:01:08Z","host":"lab-host","program":"sshd","pid":2103,"message":"Failed password for operator from 203.0.113.77 port 50103 ssh2"}
+{"timestamp":"2026-10-09T19:01:12Z","host":"lab-host","program":"sshd","pid":2104,"message":"Failed password for operator from 203.0.113.77 port 50104 ssh2"}
+{"timestamp":"2026-10-09T19:01:16Z","host":"lab-host","program":"sshd","pid":2105,"message":"Failed password for operator from 203.0.113.77 port 50105 ssh2"}
+{"timestamp":"2026-10-09T19:01:20Z","host":"lab-host","program":"sshd","pid":2106,"message":"Accepted password for operator from 203.0.113.77 port 50106 ssh2"}

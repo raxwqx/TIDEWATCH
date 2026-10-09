@@ -1,0 +1,18 @@
+Oct  9 19:01:01 lab-host sshd[2101]: Invalid user admin from 203.0.113.77 port 50101
+Oct  9 19:01:02 lab-host sshd[2101]: Failed password for invalid user admin from 203.0.113.77 port 50101 ssh2
+Oct  9 19:01:08 lab-host sshd[2102]: Invalid user administrator from 203.0.113.77 port 50102
+Oct  9 19:01:09 lab-host sshd[2102]: Failed password for invalid user administrator from 203.0.113.77 port 50102 ssh2
+Oct  9 19:01:15 lab-host sshd[2103]: Invalid user test from 203.0.113.77 port 50103
+Oct  9 19:01:16 lab-host sshd[2103]: Failed password for invalid user test from 203.0.113.77 port 50103 ssh2
+Oct  9 19:01:19 lab-host sshd[2103]: Invalid user guest-admin from 203.0.113.77 port 50110
+Oct  9 19:01:20 lab-host sshd[2103]: Invalid user deployer from 203.0.113.77 port 50111
+Oct  9 19:01:22 lab-host sshd[2104]: Failed password for root from 203.0.113.77 port 50104 ssh2
+Oct  9 19:01:28 lab-host sshd[2105]: Failed password for support from 203.0.113.77 port 50105 ssh2
+Oct  9 19:01:34 lab-host sshd[2106]: Failed password for guest from 203.0.113.77 port 50106 ssh2
+Oct  9 19:01:40 lab-host sshd[2107]: Failed password for deploy from 203.0.113.77 port 50107 ssh2
+Oct  9 19:01:46 lab-host sshd[2108]: Failed password for analyst from 203.0.113.77 port 50108 ssh2
+Oct  9 19:01:52 lab-host sshd[2109]: Accepted password for analyst from 203.0.113.77 port 50109 ssh2
+Oct  9 19:02:11 lab-host sshd[2110]: Accepted publickey for root from 198.51.100.24 port 51111 ssh2
+Oct  9 19:03:01 lab-host useradd[2120]: new user: name=temporary-audit, UID=1004, GID=1004, home=/home/temporary-audit, shell=/bin/bash
+Oct  9 19:03:05 lab-host sudo[2121]: styx : TTY=pts/0 ; PWD=/home/styx ; USER=root ; COMMAND=/usr/bin/id
+Oct  9 19:03:08 lab-host sudo[2122]: styx : TTY=pts/0 ; PWD=/home/styx ; USER=root ; COMMAND=/usr/bin/apt update
