@@ -1,4 +1,4 @@
-# TIDEWATCH
+# TIDEWATCH 🌊
 
 **Offline Linux log threat hunting and incident triage, written in Rust.**
 
