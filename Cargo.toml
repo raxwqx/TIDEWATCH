@@ -1,6 +1,6 @@
 [package]
 name = "tidewatch"
-version = "0.1.0"
+version = "5.0.0"
 edition = "2024"
 rust-version = "1.85"
 description = "Offline Linux log threat-hunting and incident triage engine"
