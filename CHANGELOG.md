@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.0.0 - 2026-11-15
+
+- Added `--fail-on-malformed` for CI and scripted JSONL triage.
+- Updated the crate version to 5.0.0.
+
+
 ## 0.1.0 - Initial release
 
 - Added offline parsing for common Linux authlog/syslog and JSONL records.
