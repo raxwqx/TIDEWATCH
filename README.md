@@ -170,6 +170,9 @@ Exit codes:
 
 ## Command-line reference
 
+Add `--fail-on-malformed` to return exit status 2 when JSONL parsing reports malformed lines. The report still contains valid events and parser statistics, so automation can preserve the partial analysis while detecting input quality issues.
+
+
 Run `tidewatch --help` or `cargo run -- --help` to view the CLI options.
 
 | **Option**                      | **Default**     | **Description**                                                                                     |
