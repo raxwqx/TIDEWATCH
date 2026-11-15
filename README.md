@@ -170,7 +170,13 @@ Exit codes:
 
 ## Command-line reference
 
-Add `--fail-on-malformed` to return exit status 2 when JSONL parsing reports malformed lines. The report still contains valid events and parser statistics, so automation can preserve the partial analysis while detecting input quality issues.
+Add `--fail-on-malformed` to return exit status `2` when JSONL parsing reports malformed lines. The report is still emitted with valid events and parser statistics, so automation can preserve the partial analysis while detecting input quality issues:
+
+```bash
+tidewatch --input events.jsonl --format jsonl --output-format json --fail-on-malformed
+```
+
+Status `2` is also used by `--fail-on-severity`; status `1` indicates an execution or input error.
 
 
 Run `tidewatch --help` or `cargo run -- --help` to view the CLI options.
@@ -183,6 +189,7 @@ Run `tidewatch --help` or `cargo run -- --help` to view the CLI options.
 | `--output-format <FORMAT>`      | `text`          | Output as `text` or `json`                                                                          |
 | `-o, --output <PATH>`           | Standard output | Write the report to a file instead of standard output                                               |
 | `--fail-on-severity <SEVERITY>` | Disabled        | Exit with status `2` if any finding meets or exceeds `info`, `low`, `medium`, `high`, or `critical` |
+| `--fail-on-malformed`           | Disabled        | Exit with status `2` if JSONL contains malformed lines; the partial report is still emitted       |
 | `--include-events`              | Disabled        | Include normalized events in JSON output; requires `--output-format json`                           |
 
 Example help command:

@@ -24,3 +24,20 @@ fn cli_prints_json_report_from_stdin() {
     assert_eq!(json["tool"], "TIDEWATCH");
     assert_eq!(json["summary"]["events_emitted"], 1);
 }
+
+#[test]
+fn fail_on_malformed_returns_partial_json_report_and_status_two() {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_tidewatch"))
+        .args(["--format", "jsonl", "--output-format", "json", "--fail-on-malformed"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("launch tidewatch binary");
+    child.stdin.take().expect("stdin pipe").write_all(b"{not-json}\n").expect("write malformed line");
+
+    let output = child.wait_with_output().expect("collect output");
+    assert_eq!(output.status.code(), Some(2));
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).expect("valid partial JSON report");
+    assert_eq!(json["summary"]["malformed_json_lines"], 1);
+}
