@@ -47,6 +47,10 @@ struct Cli {
     /// Include normalized events in JSON output. Logs may contain sensitive information.
     #[arg(long, default_value_t = false)]
     include_events: bool,
+
+    /// Return exit status 2 when JSONL input contains malformed lines.
+    #[arg(long, default_value_t = false)]
+    fail_on_malformed: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -115,7 +119,8 @@ fn execute() -> Result<u8> {
             .iter()
             .any(|alert| alert.severity >= threshold)
     });
-    Ok(if threshold_hit { 2 } else { 0 })
+    let malformed_hit = cli.fail_on_malformed && parsed.stats.malformed_json_lines > 0;
+    Ok(if threshold_hit || malformed_hit { 2 } else { 0 })
 }
 
 fn read_input(input: &str) -> Result<String> {
