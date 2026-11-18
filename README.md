@@ -7,6 +7,8 @@
 [![License](https://img.shields.io/badge/License-MIT-58A6FF?logo=opensourceinitiative\&logoColor=white)](LICENSE)
 [![Rust CI](https://img.shields.io/github/actions/workflow/status/raxwqx/TIDEWATCH/ci.yml?label=Rust%20CI\&logo=githubactions\&logoColor=white\&color=58A6FF)](https://github.com/raxwqx/TIDEWATCH/actions/workflows/ci.yml)
 
+**English** | [Türkçe](README.tr.md)
+
 TIDEWATCH is a local-first command-line tool for analyzing Linux authentication and system logs. It parses supported log lines into normalized events, evaluates configurable TOML detection rules, correlates related activity over time, and produces evidence-backed findings in terminal or JSON format.
 
 It is built for defensive security research, incident-response practice, and repeatable triage of logs you own or are authorized to examine.
@@ -25,6 +27,7 @@ It is built for defensive security research, incident-response practice, and rep
 * [Command-line reference](https://github.com/raxwqx/TIDEWATCH#command-line-reference)
 * [Input formats](https://github.com/raxwqx/TIDEWATCH#input-formats)
 * [Detection rules](https://github.com/raxwqx/TIDEWATCH#detection-rules)
+* [Event overview](https://github.com/raxwqx/TIDEWATCH#event-overview)
 * [Reports and evidence](https://github.com/raxwqx/TIDEWATCH#reports-and-evidence)
 * [Testing and development](https://github.com/raxwqx/TIDEWATCH#testing-and-development)
 * [Architecture](https://github.com/raxwqx/TIDEWATCH#architecture)
@@ -51,6 +54,7 @@ Security logs are most useful when related events can be reviewed together. TIDE
 | Normalization        | Event kind, timestamp where parseable, host, program, PID, user, source IP, command, message, and original line number |
 | Detection            | Threshold windows and failure-then-success sequence correlation                                                        |
 | Rule grouping        | Source IP, username, or source-IP-and-username combination                                                             |
+| Event overview       | Optional `--summary` with time range, kind counts, and top source-IP/user pivots, bounded by `--top`                    |
 | Results              | Human-readable terminal report or structured JSON                                                                      |
 | Workflow integration | Standard input, output files, and configurable severity exit threshold                                                 |
 | ATT&CK context       | Technique IDs attached to relevant bundled rules                                                                       |
@@ -152,7 +156,18 @@ cat /var/log/auth.log | target/release/tidewatch --format authlog
 
 You can also redirect a file directly with `--input /path/to/logfile`. Use only logs you are authorized to access.
 
-### 5. Return a non-zero status when a severity threshold is met
+### 5. Summarize the event stream before triaging alerts
+
+```bash
+target/release/tidewatch \
+  --input examples/sample-auth.log \
+  --summary \
+  --top 5
+```
+
+`--summary` adds a compact overview of the input: the observed time range, timestamp coverage, event-kind counts, and the busiest source IPs and usernames. It works in both text and JSON reports.
+
+### 6. Return a non-zero status when a severity threshold is met
 
 ```bash
 target/release/tidewatch \
@@ -181,6 +196,8 @@ Run `tidewatch --help` or `cargo run -- --help` to view the CLI options.
 | `-o, --output <PATH>`           | Standard output | Write the report to a file instead of standard output                                               |
 | `--fail-on-severity <SEVERITY>` | Disabled        | Exit with status `2` if any finding meets or exceeds `info`, `low`, `medium`, `high`, or `critical` |
 | `--include-events`              | Disabled        | Include normalized events in JSON output; requires `--output-format json`                           |
+| `--summary`                     | Disabled        | Add an event overview with time range, kind counts, and top pivots                                  |
+| `--top <N>`                     | `5`             | Number of entries per top list with `--summary`; accepts 1-100                                      |
 
 Example help command:
 
@@ -204,9 +221,11 @@ Classification is based on supported message patterns. Messages the parser does 
 
 ### JSON Lines (JSONL)
 
-JSONL input contains one JSON object per line. The parser prefers a `message` field and also recognizes `MESSAGE`, `msg`, or `event.original`. Optional fields can include `timestamp`, `host`, `program`, `pid`, `user`, `source_ip`, `command`, and `event_type`.
+JSONL input contains one JSON object per line. The parser prefers a `message` field and also recognizes `MESSAGE`, `msg`, `event.message`, or `event.original`. Optional fields can include `timestamp`, `host`, `program`, `pid`, `user`, `source_ip`, `command`, and `event_type`.
 
-RFC 3339 and common ISO-like timestamps are supported. A malformed JSON line is counted and retained as an unclassified event in the report rather than silently ignored.
+Nested fields are supported alongside flat keys. Common mappings include `host.name`, `process.name`, `process.pid`, `process.command_line`, `user.name`, `source.ip`, `client.ip`, `event.kind`, and `event.action`. A literal key containing dots still takes precedence when present.
+
+RFC 3339, common ISO-like, and integer or fractional epoch timestamps are supported. `__REALTIME_TIMESTAMP` is treated as microseconds. A malformed JSON line is counted and retained as an unclassified event in the report rather than silently ignored.
 
 See [`examples/sample-jsonl.jsonl`](https://github.com/raxwqx/TIDEWATCH/blob/main/examples/sample-jsonl.jsonl) for a fixture.
 
@@ -219,7 +238,9 @@ Supported conditions:
 * `threshold`: find a group of matching events that reaches `threshold` within `window_seconds`.
 * `failure_then_success`: find the configured number of matching events followed by one of the configured success event kinds from the same group key within the time window.
 
-Supported `group_by` values are `source_ip`, `user`, and `source_ip_user`. Time-window and sequence detections need parseable timestamps. Single-event rules can still work when timestamps are missing.
+Supported `group_by` values are `source_ip`, `user`, and `source_ip_user`. Time-window and sequence detections need parseable timestamps. Single-event rules can still work when timestamps are missing; if a group mixes timestamped and timestamp-less events, the alert prefers a timestamped event. Both correlation windows are inclusive at the boundary.
+
+Rule files reject unknown fields. A typo such as `threshhold = 8` fails validation instead of being silently ignored, which makes custom rule review safer.
 
 ### Example custom rule
 
@@ -253,16 +274,52 @@ For `failure_then_success`, also set `success_event_kinds`, for example `["ssh_a
 ### Rule behavior and tuning
 
 * Rule IDs must be unique and non-empty; invalid rule configuration returns an error.
+* Unknown rule fields are rejected so misspelled options cannot silently disable a detection.
 * A threshold rule emits at most one alert for each rule/group key when its first qualifying time window is observed.
 * Evidence contains the events used to reach the configured threshold or complete the sequence.
 * ATT&CK references provide investigation context and do not prove that a technique was used.
 * Tune thresholds against both positive and negative fixtures to understand noise and false positives.
 
+## Event overview
+
+Pass `--summary` to add an analyst-facing overview of the normalized event stream. It is useful before reading individual alerts, especially when a log contains a lot of background activity.
+
+```bash
+target/release/tidewatch --input /var/log/auth.log --summary --top 5
+```
+
+The text report adds an `Event overview` block with:
+
+* the first and last parseable timestamps and the observed duration,
+* how many events have timestamps versus how many do not,
+* counts for every normalized event kind,
+* the busiest source IPs and usernames, limited by `--top`.
+
+In JSON output the same data appears as an `event_summary` object, without requiring `--include-events`:
+
+```json
+{
+  "event_summary": {
+    "events_total": 18,
+    "events_with_timestamp": 18,
+    "events_without_timestamp": 0,
+    "first_timestamp": "2026-10-09T19:01:01",
+    "last_timestamp": "2026-10-09T19:03:08",
+    "duration_seconds": 127,
+    "by_kind": { "ssh_auth_failure": 8, "ssh_invalid_user": 5 },
+    "top_source_ips": [{ "value": "203.0.113.77", "count": 14 }],
+    "top_users": [{ "value": "analyst", "count": 2 }]
+  }
+}
+```
+
+`--top` accepts values from 1 to 100 and defaults to 5. Ties are ordered by value so output remains deterministic. The overview reflects only parsed events; it does not replace rule tuning or alert review.
+
 ## Reports and evidence
 
 Text output is designed for interactive triage. JSON output is intended for automation and further processing.
 
-Reports provide a schema version and tool version, input format and parsing summary, alerts, severity totals, and evidence. Each alert can include:
+Reports provide a schema version and tool version, input format and parsing summary, alerts, severity totals, and evidence. JSON schema version `2` adds the optional `event_summary` object produced by `--summary`. Each alert can include:
 
 * Stable rule ID, title, severity, and analyst-oriented description.
 * Observed event count and the available source-IP or user pivots.
@@ -290,7 +347,7 @@ To apply Rust formatting before checking again:
 cargo fmt
 ```
 
-GitHub Actions currently builds the project and runs the test suite on pushes and pull requests. When adding a parser pattern or rule, include representative positive and negative fixtures and tests for timestamp or missing-field edge cases where relevant.
+GitHub Actions builds and tests the project on Ubuntu, Windows, and macOS for pushes and pull requests, and also runs formatting, Clippy, a release build, and example smoke tests. When adding a parser pattern or rule, include representative positive and negative fixtures and tests for timestamp or missing-field edge cases where relevant.
 
 ## Architecture
 
@@ -301,7 +358,7 @@ The implementation is separated into focused Rust modules:
 | `parser`    | Format selection, syslog/JSONL parsing, event classification, parser statistics  |
 | `model`     | Normalized events, severity levels, alerts, and evidence types                   |
 | `detection` | TOML rule validation, grouping keys, threshold windows, and sequence correlation |
-| `report`    | Human-readable rendering and structured JSON report creation                     |
+| `report`    | Human-readable rendering, JSON report creation, and event-overview aggregation   |
 | `main`      | CLI arguments, file/stdin input, report output, and exit codes                   |
 
 See [`docs/ARCHITECTURE.md`](https://github.com/raxwqx/TIDEWATCH/blob/main/docs/ARCHITECTURE.md) for the pipeline and design notes.
@@ -313,6 +370,7 @@ See [`docs/ARCHITECTURE.md`](https://github.com/raxwqx/TIDEWATCH/blob/main/docs/
 * Distribution-specific log formats and heavily customized syslog templates may require parser updates.
 * Missing, inaccurate, or timezone-ambiguous timestamps reduce confidence in event ordering and correlation.
 * Some log fields can be absent or spoofable. A matching source IP or username is not sufficient attribution by itself.
+* `--summary` counts describe the parsed event stream; messages the parser does not recognize remain `other` and can make a pivot look smaller than the raw log.
 * Bundled thresholds are starter values, not universal policy. Legitimate activity can trigger alerts, and unsupported attack patterns may not be detected.
 * The current tool analyzes supplied input; it does not collect logs continuously, monitor a host in real time, or take remediation actions.
 
