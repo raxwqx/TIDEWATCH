@@ -55,3 +55,7 @@ JSONL timestamps support RFC 3339 strings, plain ISO-like strings, integer epoch
 ## Event overview
 
 `--summary` is computed from the normalized event stream before alerts are rendered. It aggregates event-kind counts, timestamp coverage, the first and last observed timestamps, and top source-IP and user pivots. `--top` bounds each pivot list. The overview is optional so the default JSON schema remains small, and it is included as `event_summary` in schema version 2 reports.
+
+## Exit status
+
+`0` means the analysis completed without a configured failure condition. `1` means an execution, input, or rule-loading error. `2` means an alert met `--fail-on-severity` or, when enabled, malformed JSONL was observed. A status `2` report is still written so automation can retain the partial analysis.

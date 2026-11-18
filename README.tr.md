@@ -184,7 +184,17 @@ target/release/tidewatch \
 | ------- | ------------------------------------------------------------------------------------------------- |
 | `0`     | Analiz tamamlandı ve seçilen önem eşiğini karşılayan uyarı yok, ya da eşik yapılandırılmadı       |
 | `1`     | Yürütme veya girdi hatası oluştu                                                                  |
-| `2`     | En az bir uyarı `--fail-on-severity` değerini karşıladı veya aştı                                 |
+| `2`     | En az bir uyarı `--fail-on-severity` değerini karşıladı veya aştı, ya da `--fail-on-malformed` ile bozuk JSONL bulundu |
+
+JSONL otomasyonu için `--fail-on-malformed`, bozuk satırlar varken kısmi raporu yine de üretirken durum `2` döndürür. Bozuk satırlar raporda sınıflandırılmamış olaylar olarak görünmeye devam eder.
+
+```bash
+target/release/tidewatch \
+  --input events.jsonl \
+  --format jsonl \
+  --output-format json \
+  --fail-on-malformed
+```
 
 ## Komut satırı referansı
 
@@ -201,6 +211,7 @@ CLI seçeneklerini görmek için `tidewatch --help` veya `cargo run -- --help` �
 | `--include-events`              | Kapalı          | JSON çıktısına normalleştirilmiş olayları ekle; `--output-format json` gerektirir                  |
 | `--summary`                     | Kapalı          | Zaman aralığı, tür sayıları ve üst sıralamalar içeren olay özeti ekle                               |
 | `--top <N>`                     | `5`             | `--summary` ile her üst listede gösterilecek kayıt sayısı; 1-100 arası                              |
+| `--fail-on-malformed`           | Kapalı          | JSONL girdisinde bozuk satır varsa durum `2` ile çık; kısmi rapor yine de üretilir                  |
 
 Örnek yardım komutu:
 
@@ -228,7 +239,7 @@ JSONL girdisi, satır başına bir JSON nesnesi içerir. Ayrıştırıcı öncel
 
 Düz anahtarların yanı sıra iç içe alanlar da desteklenir. Yaygın eşlemeler: `host.name`, `process.name`, `process.pid`, `process.command_line`, `user.name`, `source.ip`, `client.ip`, `event.kind` ve `event.action`. Bir nokta içeren gerçek anahtar varsa, düz anahtar önceliklidir.
 
-RFC 3339, yaygın ISO benzeri ve tam sayı ya da ondalıklı epoch zaman damgaları desteklenir. `__REALTIME_TIMESTAMP` mikrosaniye olarak yorumlanır. Bozuk bir JSON satırı sayılır ve raporda sınıflandırılmamış bir olay olarak korunur.
+RFC 3339, yaygın ISO benzeri ve tam sayı ya da ondalıklı epoch zaman damgaları desteklenir. `__REALTIME_TIMESTAMP` mikrosaniye olarak yorumlanır. Bozuk bir JSON satırı sayılır ve raporda sınıflandırılmamış bir olay olarak korunur. Otomasyonun bozuk bir satırı durum `2` koşulu olarak görmesini istiyorsanız `--fail-on-malformed` kullanın; kısmi rapor yine üretilir.
 
 Örnek için [`examples/sample-jsonl.jsonl`](https://github.com/raxwqx/TIDEWATCH/blob/main/examples/sample-jsonl.jsonl) dosyasına bakın.
 

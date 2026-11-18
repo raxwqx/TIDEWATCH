@@ -80,3 +80,34 @@ fn cli_rejects_out_of_range_top_values() {
     );
     assert!(!output.status.success());
 }
+
+#[test]
+fn cli_fail_on_malformed_returns_partial_report_and_status_two() {
+    let malformed_input = concat!(
+        "{not-json}\n",
+        "{\"message\":\"Accepted password for bob from 203.0.113.9 port 22 ssh2\"}\n"
+    );
+
+    let without_flag = run(
+        &["--format", "jsonl", "--output-format", "json"],
+        malformed_input,
+    );
+    assert!(without_flag.status.success());
+
+    let output = run(
+        &[
+            "--format",
+            "jsonl",
+            "--output-format",
+            "json",
+            "--fail-on-malformed",
+        ],
+        malformed_input,
+    );
+    assert_eq!(output.status.code(), Some(2));
+    let json: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("valid partial JSON report");
+    assert_eq!(json["summary"]["malformed_json_lines"], 1);
+    assert_eq!(json["summary"]["events_emitted"], 2);
+    assert_eq!(json["alerts"].as_array().unwrap().len(), 0);
+}
