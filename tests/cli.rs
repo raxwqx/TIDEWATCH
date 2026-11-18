@@ -14,12 +14,18 @@ fn run(args: &[&str], input: &str) -> Output {
         .stderr(Stdio::piped())
         .spawn()
         .expect("launch tidewatch binary");
-    child
-        .stdin
-        .take()
-        .expect("stdin pipe")
-        .write_all(input.as_bytes())
-        .expect("write input");
+    let mut stdin = child.stdin.take().expect("stdin pipe");
+    if let Err(error) = stdin.write_all(input.as_bytes()) {
+        // Clap can reject arguments and exit before reading stdin. That is a
+        // valid outcome for argument-validation tests, so only broken pipes are
+        // tolerated here.
+        assert_eq!(
+            error.kind(),
+            std::io::ErrorKind::BrokenPipe,
+            "write input failed: {error}"
+        );
+    }
+    drop(stdin);
     child.wait_with_output().expect("collect output")
 }
 
