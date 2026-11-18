@@ -8,7 +8,7 @@ use clap::{Parser, ValueEnum};
 use tidewatch::detection::{detect, load_rules};
 use tidewatch::model::Severity;
 use tidewatch::parser::{InputFormat, parse_input};
-use tidewatch::report::{Report, render_text};
+use tidewatch::report::{EventSummary, Report, render_text};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -47,6 +47,25 @@ struct Cli {
     /// Include normalized events in JSON output. Logs may contain sensitive information.
     #[arg(long, default_value_t = false)]
     include_events: bool,
+
+    /// Add an event overview: time range, kind counts, and top pivots.
+    #[arg(long, default_value_t = false)]
+    summary: bool,
+
+    /// Number of entries per top list when --summary is enabled (1-100).
+    #[arg(long, default_value_t = 5, value_parser = parse_top)]
+    top: usize,
+}
+
+fn parse_top(raw: &str) -> Result<usize, String> {
+    let value: usize = raw
+        .parse()
+        .map_err(|_| "top must be a positive integer".to_owned())?;
+    if (1..=100).contains(&value) {
+        Ok(value)
+    } else {
+        Err("top must be between 1 and 100".to_owned())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -76,6 +95,9 @@ fn execute() -> Result<u8> {
     let parsed = parse_input(&input_text, cli.format);
     let rules = load_rules(cli.rules.as_deref())?;
     let alerts = detect(&parsed.events, &rules);
+    let event_summary = cli
+        .summary
+        .then(|| EventSummary::from_events(&parsed.events, cli.top));
     let include_events = if cli.include_events {
         Some(parsed.events.clone())
     } else {
@@ -90,6 +112,7 @@ fn execute() -> Result<u8> {
         format!("{:?}", parsed.detected_format).to_ascii_lowercase(),
         &parsed.stats,
         alerts,
+        event_summary,
         include_events,
         VERSION,
     );

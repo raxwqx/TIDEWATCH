@@ -27,6 +27,7 @@ pub enum GroupBy {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct DetectionRule {
     pub id: String,
     pub name: String,
@@ -47,6 +48,7 @@ pub struct DetectionRule {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct RuleFile {
     version: u32,
     rules: Vec<DetectionRule>,
@@ -63,7 +65,13 @@ pub fn load_rules(path: Option<&Path>) -> Result<Vec<DetectionRule>> {
     } else {
         DEFAULT_RULES.to_owned()
     };
-    let parsed: RuleFile = toml::from_str(&content).context("rules file is not valid TOML")?;
+    parse_rules(&content)
+}
+
+/// Parse and validate a TOML rules document. Exposed separately from
+/// [`load_rules`] so rule validation can be tested without temporary files.
+pub fn parse_rules(content: &str) -> Result<Vec<DetectionRule>> {
+    let parsed: RuleFile = toml::from_str(content).context("rules file is not valid TOML")?;
     ensure!(
         parsed.version == 1,
         "unsupported rules schema version: {}",
@@ -142,10 +150,15 @@ fn detect_threshold(events: &[LogEvent], rule: &DetectionRule, alerts: &mut Vec<
 
         // Single-event rules also work when a source log has no parseable timestamp.
         if rule.threshold == 1 {
-            if let Some(event) = group.first() {
+            let event = group
+                .iter()
+                .find(|event| event.timestamp.is_some())
+                .copied()
+                .or_else(|| group.first().copied());
+            if let Some(event) = event {
                 alerts.push(build_alert(
                     rule,
-                    vec![*event],
+                    vec![event],
                     event.timestamp,
                     event.timestamp,
                 ));
@@ -280,7 +293,7 @@ fn build_alert(
 mod tests {
     use chrono::{Duration, NaiveDate};
 
-    use super::{DetectionRule, GroupBy, RuleCondition, detect, load_rules};
+    use super::{DetectionRule, GroupBy, RuleCondition, detect, load_rules, parse_rules};
     use crate::model::{EventKind, LogEvent, Severity};
 
     fn event(index: usize, kind: EventKind, minute_offset: i64) -> LogEvent {
@@ -351,5 +364,121 @@ mod tests {
     fn bundled_rules_load_and_have_unique_ids() {
         let rules = load_rules(None).unwrap();
         assert!(rules.len() >= 4);
+    }
+
+    fn threshold_rule(threshold: usize, window_seconds: i64) -> DetectionRule {
+        DetectionRule {
+            id: "TEST-002".to_owned(),
+            name: "Threshold".to_owned(),
+            description: "A test rule".to_owned(),
+            severity: Severity::Medium,
+            condition: RuleCondition::Threshold,
+            event_kinds: vec![EventKind::SshAuthFailure],
+            success_event_kinds: Vec::new(),
+            threshold,
+            window_seconds,
+            group_by: GroupBy::SourceIp,
+            mitre: Vec::new(),
+            enabled: true,
+        }
+    }
+
+    #[test]
+    fn threshold_window_is_inclusive_at_the_boundary() {
+        let inside = vec![
+            event(1, EventKind::SshAuthFailure, 0),
+            event(2, EventKind::SshAuthFailure, 150),
+            event(3, EventKind::SshAuthFailure, 300),
+        ];
+        let alerts = detect(&inside, &[threshold_rule(3, 300)]);
+        assert_eq!(alerts.len(), 1);
+        assert_eq!(alerts[0].observed_count, 3);
+
+        let outside = vec![
+            event(1, EventKind::SshAuthFailure, 0),
+            event(2, EventKind::SshAuthFailure, 150),
+            event(3, EventKind::SshAuthFailure, 301),
+        ];
+        assert!(detect(&outside, &[threshold_rule(3, 300)]).is_empty());
+    }
+
+    #[test]
+    fn sequence_window_is_inclusive_at_the_boundary() {
+        let mut events = vec![
+            event(1, EventKind::SshAuthFailure, 0),
+            event(2, EventKind::SshAuthFailure, 10),
+            event(3, EventKind::SshAuthFailure, 20),
+        ];
+        events.push(event(4, EventKind::SshAuthSuccess, 600));
+        assert_eq!(detect(&events, &[sequence_rule()]).len(), 1);
+
+        *events.last_mut().unwrap() = event(4, EventKind::SshAuthSuccess, 601);
+        assert!(detect(&events, &[sequence_rule()]).is_empty());
+    }
+
+    #[test]
+    fn single_event_rule_prefers_an_event_with_a_timestamp() {
+        let mut without_timestamp = event(1, EventKind::SshAuthFailure, 0);
+        without_timestamp.timestamp = None;
+        let with_timestamp = event(2, EventKind::SshAuthFailure, 30);
+        let alerts = detect(
+            &[without_timestamp, with_timestamp],
+            &[threshold_rule(1, 0)],
+        );
+        assert_eq!(alerts.len(), 1);
+        assert_eq!(alerts[0].evidence[0].line_number, 2);
+        assert!(alerts[0].window_start.is_some());
+    }
+
+    #[test]
+    fn rule_validation_rejects_unknown_fields_and_duplicate_ids() {
+        let unknown_field = r#"
+version = 1
+
+[[rules]]
+id = "X-001"
+name = "Typo rule"
+description = "A rule with a misspelled option."
+severity = "low"
+condition = "threshold"
+event_kinds = ["ssh_auth_failure"]
+threshhold = 3
+window_seconds = 60
+group_by = "source_ip"
+"#;
+        let error = parse_rules(unknown_field).unwrap_err();
+        assert!(
+            format!("{error:#}").contains("unknown field"),
+            "unexpected error: {error:#}"
+        );
+
+        let duplicate = r#"
+version = 1
+
+[[rules]]
+id = "X-001"
+name = "First"
+description = "First rule."
+severity = "low"
+event_kinds = ["ssh_auth_failure"]
+threshold = 1
+window_seconds = 60
+group_by = "source_ip"
+
+[[rules]]
+id = "X-001"
+name = "Second"
+description = "Second rule."
+severity = "low"
+event_kinds = ["ssh_auth_failure"]
+threshold = 1
+window_seconds = 60
+group_by = "source_ip"
+"#;
+        let error = parse_rules(duplicate).unwrap_err().to_string();
+        assert!(
+            error.contains("duplicate rule ID"),
+            "unexpected error: {error}"
+        );
     }
 }
