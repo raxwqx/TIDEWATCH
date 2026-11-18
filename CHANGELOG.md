@@ -2,6 +2,13 @@
 
 All notable changes to TIDEWATCH are documented in this file.
 
+## 0.2.1 - Malformed-JSONL exit policy
+
+### Added
+
+- Added `--fail-on-malformed` so JSONL automation can return exit status `2` when malformed lines are present. The partial report is still emitted and malformed lines remain visible as unclassified events.
+- Added a CLI test covering partial reports and the new exit condition.
+
 ## 0.2.0 - Event overview and parser hardening
 
 ### Added

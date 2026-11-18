@@ -181,7 +181,17 @@ Exit codes:
 | -------- | --------------------------------------------------------------------------------------------------- |
 | `0`      | Analysis completed and no alert met the selected severity threshold, or no threshold was configured |
 | `1`      | An execution or input error occurred                                                                |
-| `2`      | At least one alert met or exceeded `--fail-on-severity`                                             |
+| `2`      | At least one alert met or exceeded `--fail-on-severity`, or malformed JSONL was found with `--fail-on-malformed` |
+
+For JSONL automation, `--fail-on-malformed` returns status `2` when malformed lines are present while still emitting the partial report. Malformed lines remain visible in the report as unclassified events.
+
+```bash
+target/release/tidewatch \
+  --input events.jsonl \
+  --format jsonl \
+  --output-format json \
+  --fail-on-malformed
+```
 
 ## Command-line reference
 
@@ -198,6 +208,7 @@ Run `tidewatch --help` or `cargo run -- --help` to view the CLI options.
 | `--include-events`              | Disabled        | Include normalized events in JSON output; requires `--output-format json`                           |
 | `--summary`                     | Disabled        | Add an event overview with time range, kind counts, and top pivots                                  |
 | `--top <N>`                     | `5`             | Number of entries per top list with `--summary`; accepts 1-100                                      |
+| `--fail-on-malformed`           | Disabled        | Exit with status `2` when JSONL input contains malformed lines; the partial report is still emitted |
 
 Example help command:
 
@@ -225,7 +236,7 @@ JSONL input contains one JSON object per line. The parser prefers a `message` fi
 
 Nested fields are supported alongside flat keys. Common mappings include `host.name`, `process.name`, `process.pid`, `process.command_line`, `user.name`, `source.ip`, `client.ip`, `event.kind`, and `event.action`. A literal key containing dots still takes precedence when present.
 
-RFC 3339, common ISO-like, and integer or fractional epoch timestamps are supported. `__REALTIME_TIMESTAMP` is treated as microseconds. A malformed JSON line is counted and retained as an unclassified event in the report rather than silently ignored.
+RFC 3339, common ISO-like, and integer or fractional epoch timestamps are supported. `__REALTIME_TIMESTAMP` is treated as microseconds. A malformed JSON line is counted and retained as an unclassified event in the report rather than silently ignored. Use `--fail-on-malformed` when automation should treat any malformed line as a status `2` condition while keeping the partial report.
 
 See [`examples/sample-jsonl.jsonl`](https://github.com/raxwqx/TIDEWATCH/blob/main/examples/sample-jsonl.jsonl) for a fixture.
 
